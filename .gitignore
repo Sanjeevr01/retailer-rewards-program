@@ -31,3 +31,13 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# IntelliJ configuration files
+.idea/
+*.iml
+
+# Mac system files
+.DS_Store
+
+# Log files
+*.log
