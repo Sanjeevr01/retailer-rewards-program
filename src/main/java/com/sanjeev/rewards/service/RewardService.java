@@ -3,6 +3,7 @@ package com.sanjeev.rewards.service;
 import com.sanjeev.rewards.dto.CustomerRewardResponse;
 import com.sanjeev.rewards.dto.MonthlyReward;
 import com.sanjeev.rewards.entity.Transaction;
+import com.sanjeev.rewards.exception.CustomerNotFoundException;
 import com.sanjeev.rewards.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 
@@ -23,14 +24,18 @@ public class RewardService {
 
     // Get rewards for all customers.
     public List<CustomerRewardResponse> getAllCustomerRewards() {
+
         List<Transaction> transactions = transactionRepository.findAll();
 
         Map<Long, List<Transaction>> customerTransactions = transactions.stream()
                 .collect(Collectors.groupingBy(Transaction::getCustomerId));
 
         List<CustomerRewardResponse> responseList = new ArrayList<>();
+
         for (Map.Entry<Long, List<Transaction>> entry : customerTransactions.entrySet()) {
+
             List<Transaction> customerTransactionList = entry.getValue();
+
             String customerName = customerTransactionList.get(0).getCustomerName();
 
             Map<YearMonth, Long> monthlyRewardsMap =
@@ -73,7 +78,9 @@ public class RewardService {
                 transactionRepository.findByCustomerId(customerId);
 
         if (transactions.isEmpty()) {
-            throw new RuntimeException("Customer not found with ID: " + customerId);
+            throw new CustomerNotFoundException(
+                    "Customer not found with ID: " + customerId
+            );
         }
 
         String customerName = transactions.get(0).getCustomerName();
@@ -119,6 +126,4 @@ public class RewardService {
 
         return (long) ((amount - 100) * 2 + 50);
     }
-
-
 }
