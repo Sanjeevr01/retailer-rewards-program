@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 class RewardServiceTest {
@@ -29,6 +30,11 @@ class RewardServiceTest {
         MockitoAnnotations.openMocks(this);
     }
 
+    /**
+     * Positive Test
+     * Amount = 120
+     * Reward = 90
+     */
     @Test
     void shouldReturnCorrectRewardsForCustomer() {
 
@@ -38,18 +44,14 @@ class RewardServiceTest {
                         1L,
                         "John",
                         120.0,
-                        LocalDate.of(2026, 3, 15)
-                ),
-                new Transaction(
-                        2L,
-                        1L,
-                        "John",
-                        75.0,
-                        LocalDate.of(2026, 4, 10)
+                        LocalDate.now().minusDays(10)
                 )
         );
 
-        when(transactionRepository.findByCustomerId(1L))
+        when(transactionRepository
+                .findByCustomerIdAndTransactionDateAfter(
+                        any(Long.class),
+                        any(LocalDate.class)))
                 .thenReturn(transactions);
 
         CustomerRewardResponse response =
@@ -58,9 +60,14 @@ class RewardServiceTest {
         assertNotNull(response);
         assertEquals(1L, response.getCustomerId());
         assertEquals("John", response.getCustomerName());
-        assertEquals(115L, response.getTotalRewards());
+        assertEquals(90L, response.getTotalRewards());
     }
 
+    /**
+     * Positive Test
+     * Amount <= 50
+     * Reward = 0
+     */
     @Test
     void shouldReturnZeroRewardsForAmountLessThan50() {
 
@@ -74,7 +81,10 @@ class RewardServiceTest {
                 )
         );
 
-        when(transactionRepository.findByCustomerId(1L))
+        when(transactionRepository
+                .findByCustomerIdAndTransactionDateAfter(
+                        any(Long.class),
+                        any(LocalDate.class)))
                 .thenReturn(transactions);
 
         CustomerRewardResponse response =
@@ -83,18 +93,11 @@ class RewardServiceTest {
         assertEquals(0L, response.getTotalRewards());
     }
 
-    @Test
-    void shouldThrowExceptionWhenCustomerNotFound() {
-
-        when(transactionRepository.findByCustomerId(999L))
-                .thenReturn(List.of());
-
-        assertThrows(
-                CustomerNotFoundException.class,
-                () -> rewardService.getRewardsByCustomerId(999L)
-        );
-    }
-
+    /**
+     * Positive Test
+     * Amount = 100
+     * Reward = 50
+     */
     @Test
     void shouldReturnFiftyPointsForHundredDollars() {
 
@@ -108,7 +111,10 @@ class RewardServiceTest {
                 )
         );
 
-        when(transactionRepository.findByCustomerId(1L))
+        when(transactionRepository
+                .findByCustomerIdAndTransactionDateAfter(
+                        any(Long.class),
+                        any(LocalDate.class)))
                 .thenReturn(transactions);
 
         CustomerRewardResponse response =
@@ -117,4 +123,95 @@ class RewardServiceTest {
         assertEquals(50L, response.getTotalRewards());
     }
 
+    /**
+     * Positive Test
+     * Verify getAllCustomerRewards()
+     */
+    @Test
+    void shouldReturnAllCustomerRewards() {
+
+        List<Transaction> transactions = List.of(
+                new Transaction(
+                        1L,
+                        1L,
+                        "John",
+                        120.0,
+                        LocalDate.now()
+                ),
+                new Transaction(
+                        2L,
+                        2L,
+                        "David",
+                        200.0,
+                        LocalDate.now()
+                )
+        );
+
+        when(transactionRepository
+                .findByTransactionDateAfter(any(LocalDate.class)))
+                .thenReturn(transactions);
+
+        List<CustomerRewardResponse> responses =
+                rewardService.getAllCustomerRewards();
+
+        assertEquals(2, responses.size());
+    }
+
+    /**
+     * Positive Test
+     * Verify multiple transactions are summed correctly.
+     * 120 = 90 points
+     * 75 = 25 points
+     * Total = 115 points
+     */
+    @Test
+    void shouldCalculateTotalRewardsFromMultipleTransactions() {
+
+        List<Transaction> transactions = List.of(
+                new Transaction(
+                        1L,
+                        1L,
+                        "John",
+                        120.0,
+                        LocalDate.now()
+                ),
+                new Transaction(
+                        2L,
+                        1L,
+                        "John",
+                        75.0,
+                        LocalDate.now()
+                )
+        );
+
+        when(transactionRepository
+                .findByCustomerIdAndTransactionDateAfter(
+                        any(Long.class),
+                        any(LocalDate.class)))
+                .thenReturn(transactions);
+
+        CustomerRewardResponse response =
+                rewardService.getRewardsByCustomerId(1L);
+
+        assertEquals(115L, response.getTotalRewards());
+    }
+
+    /**
+     * Negative Test
+     * Customer not found.
+     */
+    @Test
+    void shouldThrowExceptionWhenCustomerNotFound() {
+
+        when(transactionRepository
+                .findByCustomerIdAndTransactionDateAfter(
+                        any(Long.class),
+                        any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        assertThrows(
+                CustomerNotFoundException.class,
+                () -> rewardService.getRewardsByCustomerId(999L)
+        );
+    }
 }

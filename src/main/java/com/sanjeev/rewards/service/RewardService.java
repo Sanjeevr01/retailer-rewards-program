@@ -7,8 +7,8 @@ import com.sanjeev.rewards.exception.CustomerNotFoundException;
 import com.sanjeev.rewards.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -16,95 +16,105 @@ import java.util.stream.Collectors;
 @Service
 public class RewardService {
 
+    private static final int FIFTY_DOLLARS = 50;
+    private static final int HUNDRED_DOLLARS = 100;
+
     private final TransactionRepository transactionRepository;
 
     public RewardService(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
     }
 
-    // Get rewards for all customers.
+    // Returns rewards for all customers for the last 3 months.
     public List<CustomerRewardResponse> getAllCustomerRewards() {
 
-        List<Transaction> transactions = transactionRepository.findAll();
+        // Calculating date exactly 3 months before
+        LocalDate threeMonthsAgo = LocalDate.now().minusMonths(3);
 
-        Map<Long, List<Transaction>> customerTransactions = transactions.stream()
-                .collect(Collectors.groupingBy(Transaction::getCustomerId));
+        // Fetching all transactions after the calculated date
+        List<Transaction> transactions =
+                transactionRepository.findByTransactionDateAfter(
+                        threeMonthsAgo
+                );
 
-        List<CustomerRewardResponse> responseList = new ArrayList<>();
+        // Grouping transactions by customer ID
+        Map<Long, List<Transaction>> customerTransactions =
+                transactions.stream()
+                        .collect(Collectors.groupingBy(
+                                Transaction::getCustomerId
+                        ));
 
-        for (Map.Entry<Long, List<Transaction>> entry : customerTransactions.entrySet()) {
-
-            List<Transaction> customerTransactionList = entry.getValue();
-
-            String customerName = customerTransactionList.get(0).getCustomerName();
-
-            Map<YearMonth, Long> monthlyRewardsMap =
-                    customerTransactionList.stream()
-                            .collect(Collectors.groupingBy(
-                                    transaction -> YearMonth.from(transaction.getTransactionDate()),
-                                    Collectors.summingLong(transaction ->
-                                            calculateRewardPoints(transaction.getAmount()))
-                            ));
-
-            List<MonthlyReward> monthlyRewards = monthlyRewardsMap.entrySet()
-                    .stream()
-                    .map(monthEntry -> new MonthlyReward(
-                            monthEntry.getKey().toString(),
-                            monthEntry.getValue()))
-                    .toList();
-
-            Long totalRewards = monthlyRewardsMap.values()
-                    .stream()
-                    .mapToLong(Long::longValue)
-                    .sum();
-
-            CustomerRewardResponse response = new CustomerRewardResponse(
-                    entry.getKey(),
-                    customerName,
-                    monthlyRewards,
-                    totalRewards
-            );
-
-            responseList.add(response);
-        }
-
-        return responseList;
+        // Converting each customer transaction list into a CustomerRewardResponse Object and return the list of responses
+        return customerTransactions.entrySet()
+                .stream()
+                .map(entry ->
+                        buildCustomerRewardResponse(
+                                entry.getKey(),
+                                entry.getValue()
+                        )
+                )
+                .toList();
     }
 
-    // Get rewards for a specific customer.
-    public CustomerRewardResponse getRewardsByCustomerId(Long customerId) {
+    // Returns rewards for a specific customer for the last 3 months.
+    public CustomerRewardResponse getRewardsByCustomerId(
+            Long customerId) {
 
+        // Calculating date exactly 3 months before
+        LocalDate threeMonthsAgo = LocalDate.now().minusMonths(3);
+
+        // Fetching transactions for the given customer only for last 3 months
         List<Transaction> transactions =
-                transactionRepository.findByCustomerId(customerId);
+                transactionRepository
+                        .findByCustomerIdAndTransactionDateAfter(
+                                customerId,
+                                threeMonthsAgo
+                        );
 
+        // If no transactions found, throw custom exception
         if (transactions.isEmpty()) {
             throw new CustomerNotFoundException(
                     "Customer not found with ID: " + customerId
             );
         }
 
-        String customerName = transactions.get(0).getCustomerName();
+        // Build final response object
+        return buildCustomerRewardResponse(
+                customerId,
+                transactions
+        );
+    }
 
+    // Builds final customer response.
+    private CustomerRewardResponse buildCustomerRewardResponse(
+            Long customerId,
+            List<Transaction> transactions) {
+
+        // Assuming all transactions belong to the same customer, we can get the customer name from the first transaction
+        String customerName =
+                transactions.get(0).getCustomerName();
+
+        // Calculating monthly rewards
         Map<YearMonth, Long> monthlyRewardsMap =
-                transactions.stream()
-                        .collect(Collectors.groupingBy(
-                                transaction -> YearMonth.from(transaction.getTransactionDate()),
-                                Collectors.summingLong(transaction ->
-                                        calculateRewardPoints(transaction.getAmount()))
-                        ));
+                calculateMonthlyRewards(transactions);
 
-        List<MonthlyReward> monthlyRewards = monthlyRewardsMap.entrySet()
-                .stream()
-                .map(entry -> new MonthlyReward(
-                        entry.getKey().toString(),
-                        entry.getValue()))
-                .toList();
+        // Converting monthly rewards map to a list of MonthlyReward objects
+        List<MonthlyReward> monthlyRewards =
+                monthlyRewardsMap.entrySet()
+                        .stream()
+                        .map(entry ->
+                                new MonthlyReward(
+                                        entry.getKey().toString(),
+                                        entry.getValue()
+                                )
+                        )
+                        .toList();
 
-        Long totalRewards = monthlyRewardsMap.values()
-                .stream()
-                .mapToLong(Long::longValue)
-                .sum();
+        // Calculating total rewards
+        Long totalRewards =
+                calculateTotalRewards(monthlyRewardsMap);
 
+        // Building and returning the final response object
         return new CustomerRewardResponse(
                 customerId,
                 customerName,
@@ -113,17 +123,52 @@ public class RewardService {
         );
     }
 
-    // Calculate reward points based on transaction amount.
+    // Calculates rewards grouped by month.
+    private Map<YearMonth, Long> calculateMonthlyRewards(
+            List<Transaction> transactions) {
+
+        return transactions.stream()
+                .collect(Collectors.groupingBy(
+                        transaction ->
+                                YearMonth.from(
+                                        transaction.getTransactionDate()
+                                ),
+                        Collectors.summingLong(
+                                transaction ->
+                                        calculateRewardPoints(
+                                                transaction.getAmount()
+                                        )
+                        )
+                ));
+    }
+
+    // Calculates total reward points.
+    private Long calculateTotalRewards(
+            Map<YearMonth, Long> monthlyRewardsMap) {
+
+        return monthlyRewardsMap.values()
+                .stream()
+                .mapToLong(Long::longValue)
+                .sum();
+    }
+
+    // Reward calculation logic.
     private Long calculateRewardPoints(Double amount) {
 
-        if (amount <= 50) {
+        // No rewards for transactions of $50 or less
+        if (amount <= FIFTY_DOLLARS) {
             return 0L;
         }
 
-        if (amount <= 100) {
-            return (long) (amount - 50);
+        // 1 reward point for every dollar spent over $50 up to $100
+        if (amount <= HUNDRED_DOLLARS) {
+            return (long) (amount - FIFTY_DOLLARS);
         }
 
-        return (long) ((amount - 100) * 2 + 50);
+        // 2 reward points for every dollar spent over $100
+        return (long) (
+                (amount - HUNDRED_DOLLARS) * 2
+                        + FIFTY_DOLLARS
+        );
     }
 }

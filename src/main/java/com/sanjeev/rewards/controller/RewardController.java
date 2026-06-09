@@ -19,13 +19,13 @@ public class RewardController {
         this.rewardService = rewardService;
     }
 
-    // Get reward details for all customers.
+    // Get reward details for all customers for the last 3 months.
     @GetMapping
     public List<CustomerRewardResponse> getAllCustomerRewards() {
         return rewardService.getAllCustomerRewards();
     }
 
-    // Get reward details for a specific customer.
+    // Get reward details for a specific customer for the last 3 months.
     @GetMapping("/{customerId}")
     public CustomerRewardResponse getRewardsByCustomerId(
             @PathVariable Long customerId) {

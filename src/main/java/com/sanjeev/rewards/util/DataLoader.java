@@ -25,7 +25,7 @@ public class DataLoader implements CommandLineRunner {
                         1L,
                         "John",
                         120.0,
-                        LocalDate.of(2026, 3, 15)
+                        LocalDate.now().minusMonths(2)
                 )
         );
 
@@ -35,7 +35,7 @@ public class DataLoader implements CommandLineRunner {
                         1L,
                         "John",
                         75.0,
-                        LocalDate.of(2026, 4, 10)
+                        LocalDate.now().minusMonths(1)
                 )
         );
 
@@ -45,7 +45,7 @@ public class DataLoader implements CommandLineRunner {
                         2L,
                         "David",
                         200.0,
-                        LocalDate.of(2026, 3, 5)
+                        LocalDate.now().minusMonths(1)
                 )
         );
 
@@ -55,7 +55,7 @@ public class DataLoader implements CommandLineRunner {
                         2L,
                         "David",
                         95.0,
-                        LocalDate.of(2026, 5, 20)
+                        LocalDate.now()
                 )
         );
 
@@ -65,7 +65,7 @@ public class DataLoader implements CommandLineRunner {
                         3L,
                         "Smith",
                         45.0,
-                        LocalDate.of(2026, 4, 25)
+                        LocalDate.now().minusMonths(1)
                 )
         );
     }
